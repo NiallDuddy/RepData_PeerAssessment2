@@ -1,0 +1,135 @@
+---
+title: "An exploratory analysis of the U.S. National Oceanic and Atmospheric Administration's (NOAA) storm database in relation to storms' effects on health and economy"
+author: "N Duddy"
+date: "Sunday, October 26, 2014"
+---
+
+##Synopsis
+
+The analysis is of the effects that storms have on health and the economy. The dataset used in this exploratory analysis is from the U.S. National Oceanic and Atmospheric Administration's (NOAA) storm database, a link to which is [here](http://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2). 
+
+Two questions are explored: 
+
+1. Across the United States, which types of events (as indicated in the EVTYPE variable) are most harmful with respect to population health? 
+
+2. Across the United States, which types of events have the greatest economic consequences? 
+
+The data is downloaded and cleaned in respect to missing values and errors in Event Types. The total amount of injuries, fatalities, property and crop damages are extracted and graphed in relation to Event Types. 
+
+Tornado events are found to cause the most injuries and fatalities collectively whereas floods are found to cause the most economic damage.
+
+##Data Processing
+
+The data is downloaded, decompressed and read in from a csv file.
+```{r, cache=TRUE}
+if(!file.exists("repdata_data_StormData.csv.bz2"))
+    download.file("http://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2", "curl")
+if(!file.exists("repdata_data_StormData.csv"))
+    bunzip("repdata_data_StormData.csv.bz2")
+StormData <- read.table("repdata_data_StormData.csv", sep = ",", header=T, na.strings="?")
+```
+
+Contents of the Storm dataset. 
+```{r}
+str(StormData)
+```
+
+To clean up the dataset, the fatalities, injuries, property damages, crop damages, property damages exponent and crop damages exponenet columns are extracted. This reduces the width of the dataset from 37 columns to just 7 columns.
+```{r, cache=TRUE}
+StormClean <- StormData[StormData$FATALITIES>0|StormData$INJURIES>0|StormData$PROPDMG>0|StormData$CROPDMG>0,c(8,23,24,25,26,27,28)]
+str(StormClean)
+```
+
+As there are many duplicate Event Type categories and spelling mistakes, an attempt to reduce the amount of unique Event Type categories is made by grouping similar event types. 
+```{r, cache=TRUE}
+StormClean$EVTYPE <- toupper(StormClean$EVTYPE)
+StormClean$EVTYPE[grep('SURF|COASTAL|SURGE|CSTL|TSUNAMI', StormClean$EVTYPE)] <- 'COSTAL'
+StormClean$EVTYPE[grep('RIP|TIDE|MARINE|SEA|WAVE|SWELL|WATERSPOUT', StormClean$EVTYPE)] <- 'SEA'
+StormClean$EVTYPE[grep('RIVER|URBAN|FLASH|LAKE|DAM|FLOOD|WATER|SEICHE', StormClean$EVTYPE)] <- 'FLOOD'
+StormClean$EVTYPE[grep('WET', StormClean$EVTYPE)] <- 'WET'
+StormClean$EVTYPE[grep('LAND|MUD|ROCK|EROSION', StormClean$EVTYPE)] <- 'LANDSLIDE'
+StormClean$EVTYPE[grep('FOG', StormClean$EVTYPE)] <- 'FOG'
+StormClean$EVTYPE[grep('RAIN|BURST|PRECIP|SHOWER', StormClean$EVTYPE)] <- 'RAIN'
+StormClean$EVTYPE[grep('LIGHTNING', StormClean$EVTYPE)] <- 'LIGHTNING'
+StormClean$EVTYPE[grep('WIND|TURBUL', StormClean$EVTYPE)] <- 'WIND'
+StormClean$EVTYPE[grep('COLD|HYPO', StormClean$EVTYPE)] <- 'COLD'
+StormClean$EVTYPE[grep('THUNDERSTORM|TSTM', StormClean$EVTYPE)] <- 'THUNDERSTORM'
+StormClean$EVTYPE[grep('HAIL', StormClean$EVTYPE)] <- 'HAIL'
+StormClean$EVTYPE[grep('TORNADO|TORNDAO|FUNNEL', StormClean$EVTYPE)] <- 'TORNADO'
+StormClean$EVTYPE[grep('HURRICANE|TROPICAL|STORM WIND|TYPHOON', StormClean$EVTYPE)] <- 'HURRICANE'
+StormClean$EVTYPE[grep('DUST|GUSTNADO', StormClean$EVTYPE)] <- 'DUST'
+StormClean$EVTYPE[grep('WARM|HEAT|DROUGHT|HYPER', StormClean$EVTYPE)] <- 'HEAT'
+StormClean$EVTYPE[grep('FIRE|SMOKE|ASH', StormClean$EVTYPE)] <- 'FIRE'
+StormClean$EVTYPE[grep('SNOW', StormClean$EVTYPE)] <- 'HEAVY SNOW'
+StormClean$EVTYPE[grep('ICE|FREEZ|FROST|ICY|GLAZE', StormClean$EVTYPE)] <- 'ICE'
+StormClean$EVTYPE[grep('AVALAN', StormClean$EVTYPE)] <- 'AVALANCHE'
+StormClean$EVTYPE[grep('BLIZZ|WINTER STORM|WINTER WEATHER|WINTRY MIX', StormClean$EVTYPE)] <- 'BLIZZARD'
+```
+
+Newly distilled Event Type categories. The number of Event Types are reduced from 984 to just 31.
+```{r}
+unique(StormClean$EVTYPE)
+```
+
+The values of property and crop damages are represented by a character representation of an exponential value and a multiplier in two separate columns. The actual integer value of property and crop damages are calculated and assigned to their respective columns, property damages and crop damages. 
+```{r, cache=TRUE}
+StormClean$PROPDMG <- ifelse(StormClean$PROPDMGEXP=='K', StormClean$PROPDMG*1000, StormClean$PROPDMG)
+StormClean$PROPDMG <- ifelse(StormClean$PROPDMGEXP=='M', StormClean$PROPDMG*1000000, StormClean$PROPDMG)
+StormClean$PROPDMG <- ifelse(StormClean$PROPDMGEXP=='B', StormClean$PROPDMG*1000000000, StormClean$PROPDMG)
+StormClean$CROPDMG <- ifelse(StormClean$CROPDMGEXP=='K', StormClean$CROPDMG*1000, StormClean$CROPDMG)
+StormClean$CROPDMG <- ifelse(StormClean$CROPDMGEXP=='M', StormClean$CROPDMG*1000000, StormClean$CROPDMG)
+StormClean$CROPDMG <- ifelse(StormClean$CROPDMGEXP=='B', StormClean$CROPDMG*1000000000, StormClean$CROPDMG)
+```
+
+The total number of injuries and fatalities for each Event Type are calculated and stored. In dollars, the sum total of both property and crop damages for each Event Type is calculated and stored.
+```{r, cache=TRUE}
+injuryData <- aggregate(StormClean$INJURIES, by=list(StormClean$EVTYPE), FUN=sum)
+names(injuryData) <- c("EVTYPE","INJURIES")
+fatalityData <- aggregate(StormClean$FATALITIES, by=list(StormClean$EVTYPE), FUN=sum)
+names(fatalityData) <- c("EVTYPE","FATALITIES")
+economy <- aggregate(StormClean$PROPDMG + StormClean$CROPDMG, by=list(StormClean$EVTYPE), FUN=sum, na.rm=TRUE)
+names(economy) <- c("EVTYPE","VALUE")
+```
+
+The results are combined into one dataset.
+```{r, cache=TRUE}
+final <- data.frame(injuryData$EVTYPE, injuryData$INJURIES, fatalityData$FATALITIES, economy$VALUE)
+names(final) <- c("EVTYPE","INJURIES","FATALITIES","VALUE")
+final
+```
+
+##Analysis
+
+The total number of Injuries are plotted against Event Type.
+```{r}
+library(ggplot2)
+ggplot(final, aes(x=EVTYPE, y=INJURIES)) +
+  geom_bar(stat="identity") + coord_flip()+labs(title="Storm related injuries in the US")+labs(x="Event Types")+labs(y="Injuries")
+```
+
+The total number of Fatalities are plotted against Event Type.
+```{r}
+ggplot(final, aes(x=EVTYPE, y=FATALITIES)) +
+  geom_bar(stat="identity") + coord_flip()+labs(title="Storm related fatalities in the US")+labs(x="Event Types")+labs(y="Fatalities")
+```
+
+The sum total of both property and crop damages are plotted against Event Type.
+```{r}
+library(ggplot2)
+ggplot(final, aes(x=EVTYPE, y=VALUE)) +
+  geom_bar(stat="identity") + coord_flip()+labs(title="Storm related economic damages in the US")+labs(x="Eventsy Types")+labs(y="Dollars")
+```
+
+##Results
+
+The analysis answers the two questions as stated in the synopsis. 
+
+1. Across the United States, which types of events (as indicated in the EVTYPE variable) are most harmful with respect to population health? 
+
+It is shown through sheer numbers and visually through the above graphs that tornadoes cause the most injuries and fatalities in total in this dataset.
+
+2. Across the United States, which types of events have the greatest economic consequences? 
+
+The second part of the analysis is a little harder to answer. The numbers and graph tell us that flooding has the greatest economic consequence. Although, if the dataset were better categorised or processed by the author, it may show us that some or many hurricanes may have a great part in creating some of these floods. This could possibly reverse or level the actual values of floods and hurricanes on the graph. 
+
+##End Of Paper
